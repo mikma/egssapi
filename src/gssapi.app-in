@@ -1,0 +1,17 @@
+{application, gssapi,
+ [{description, "GSSAPI"},
+  {vsn,"@VSN@"},
+  {modules, [
+	     'SPNEGOASNOneSpec',
+	     gssapi,
+	     gssapi_app,
+	     gssapi_sup,
+	     spnego
+	    ]},
+  {registered, []},
+  {mod, {gssapi_app, []}},
+  {env, []},
+  {applications, [
+		  kernel,
+		  stdlib
+		  ]}]}.
