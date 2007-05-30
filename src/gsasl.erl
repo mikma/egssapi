@@ -54,7 +54,7 @@
 	 server_init/3,
 	 client_init/3]).
 
--define(APP, gssapi).
+-define(APP, egssapi).
 
 -define(ENABLE_DEBUG, yes).
 
