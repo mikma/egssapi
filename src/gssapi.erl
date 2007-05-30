@@ -26,6 +26,7 @@
 
 -define(GSSAPI_DRV, "gssapi_drv").
 -define(SERVER, ?MODULE).
+-define(APP, egssapi).
 
 -record(state, {
 	  port,
@@ -48,7 +49,7 @@ start() ->
 %%     supervisor:start_child(gssapi_sup, {gssapi, {gssapi, start_link, [KeyTab]}, permanent, 2000, worker, [gssapi]}).
 
 start_link(KeyTab) ->
-    Prog = filename:join(code:priv_dir(gssapi), ?GSSAPI_DRV),
+    Prog = filename:join(code:priv_dir(?APP), ?GSSAPI_DRV),
     start_link(KeyTab, Prog).
 %%     start("/home/mikael/src/erlang/yaws/gssapi_drv").
 
