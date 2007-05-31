@@ -61,11 +61,15 @@
 
 #define HTTP_UNAUTHORIZED -1
 
+
 void
 gss_print_errors (int min_stat);
 
 void
 gss_err(int exitval, int status, const char *fmt, ...);
+
+static int
+decode_gssapi_binary(char *buf, int *index, gss_buffer_desc *bin);
 
 static void
 k5_save(const char *princ_name, gss_cred_id_t cred, char **pccname)
@@ -98,16 +102,16 @@ find_mech(gss_OID oid)
 }
 
 static int 
-authenticate_user(gss_buffer_desc *in,
-		  gss_buffer_desc *out,
-		  gss_buffer_desc *name,
-		  char **pccname)
+accept_user(gss_buffer_desc *in,
+	    gss_buffer_desc *out,
+	    gss_buffer_desc *name,
+	    char **pccname)
 {
     OM_uint32 maj_stat, min_stat;
     gss_name_t src_name = GSS_C_NO_NAME;
     gss_ctx_id_t ctx = GSS_C_NO_CONTEXT;
     gss_OID oid = GSS_C_NO_OID;
-    int ret;
+    int ret = -1;
     gss_cred_id_t delegated_cred_handle = NULL;
 
     *pccname = NULL;
@@ -125,7 +129,8 @@ authenticate_user(gss_buffer_desc *in,
 
     /* XXX */
     if ((maj_stat & GSS_S_CONTINUE_NEEDED) || maj_stat != GSS_S_COMPLETE) {
-	fprintf(stderr, "gss_accept_sec_context:");
+	fprintf(stderr, "gss_accept_sec_context: %08x %d %d ",
+		maj_stat, maj_stat & GSS_S_CONTINUE_NEEDED, maj_stat != GSS_S_COMPLETE);
 	gss_print_errors(min_stat);
 	ret = HTTP_UNAUTHORIZED;
 	goto out;
@@ -163,6 +168,54 @@ authenticate_user(gss_buffer_desc *in,
     return ret;
 }
 
+static int
+init_user(const char *service,
+	  const char *hostname,
+	  gss_buffer_desc *input_token,
+	  gss_buffer_desc *output_token)
+{
+    OM_uint32 maj_stat, min_stat;
+    gss_buffer_desc name_token;
+    gss_name_t server;
+    gss_ctx_id_t context_hdl = GSS_C_NO_CONTEXT;
+    const gss_OID mech_oid = GSS_C_NO_OID;
+//gss_mech_krb5;
+/*     char *ccname = NULL; */
+
+    memset(&name_token, 0, sizeof(name_token));
+
+    name_token.length = asprintf ((char **)&name_token.value,
+                                  "%s@%s", service, hostname);
+
+    maj_stat = gss_import_name (&min_stat,
+                                &name_token,
+                                GSS_C_NT_HOSTBASED_SERVICE,
+                                &server);
+
+    if (GSS_ERROR(maj_stat))
+        gss_err (1, min_stat,
+                 "Error importing name `%s@%s':\n", service, hostname);
+
+    maj_stat =
+	gss_init_sec_context(&min_stat,
+			     GSS_C_NO_CREDENTIAL,
+			     &context_hdl,
+			     server,
+			     mech_oid,
+			     GSS_C_DELEG_FLAG,
+			     0,
+			     GSS_C_NO_CHANNEL_BINDINGS,
+			     input_token,
+			     NULL,
+			     output_token,
+			     NULL,
+			     NULL);
+    if (GSS_ERROR(maj_stat))
+	gss_err (1, min_stat, "gss_init_sec_context");
+
+    return maj_stat;
+}
+
 /* From Heimdal */
 
 void
@@ -190,7 +243,7 @@ gss_verr(int exitval, int status, const char *fmt, va_list ap)
 {
 /*     vwarnx (fmt, ap); */
     gss_print_errors (status);
-    exit (exitval);
+/*     exit (exitval); */
 }
 
 void
@@ -206,19 +259,13 @@ gss_err(int exitval, int status, const char *fmt, ...)
 
 void test(int argc, char *argv[])
 {
-    OM_uint32 maj_stat, min_stat;
     const char *hostname;
     const char *service = "HTTP";
-    gss_buffer_desc name_token;
     gss_buffer_desc input_token;
     gss_buffer_desc output_token;
     gss_buffer_desc name;
-    gss_name_t server;
-    gss_ctx_id_t context_hdl = GSS_C_NO_CONTEXT;
-    const gss_OID mech_oid = gss_mech_krb5;
     char *ccname = NULL;
 
-    memset(&name_token, 0, sizeof(name_token));
     memset(&input_token, 0, sizeof(input_token));
     memset(&output_token, 0, sizeof(output_token));
     memset(&name, 0, sizeof(name));
@@ -228,97 +275,58 @@ void test(int argc, char *argv[])
 
     hostname = argv[1];
 
-    name_token.length = asprintf ((char **)&name_token.value,
-                                  "%s@%s", service, hostname);
-
-    maj_stat = gss_import_name (&min_stat,
-                                &name_token,
-                                GSS_C_NT_HOSTBASED_SERVICE,
-                                &server);
-
-    if (GSS_ERROR(maj_stat))
-        gss_err (1, min_stat,
-                 "Error importing name `%s@%s':\n", service, hostname);
-
-    maj_stat =
-	gss_init_sec_context(&min_stat,
-			     GSS_C_NO_CREDENTIAL,
-			     &context_hdl,
-			     server,
-			     mech_oid,
-/* 			     GSS_C_MUTUAL_FLAG | GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG, */
-			     GSS_C_DELEG_FLAG,
-			     0,
-/* 			     &input_chan_bindings, */
-			     GSS_C_NO_CHANNEL_BINDINGS,
-/* 			     &input_token, */
-			     NULL, 
-			     NULL,
-			     &output_token,
-			     NULL,
-			     NULL);
-    if (GSS_ERROR(maj_stat))
-	gss_err (1, min_stat, "gss_init_sec_context");
+    init_user(service, hostname, NULL, &output_token);
 
 /*     fwrite(output_token.value, output_token.length, 1, stdout); */
 
- 
-    if (authenticate_user(&output_token, &input_token, &name, &ccname) == OK) {
+    if (accept_user(&output_token, &input_token, &name, &ccname) == OK) {
 	fprintf(stderr, "User authenticated\n");
     }
 }
 
-static int negotiate(char *buf, int index, ei_x_buff *presult)
+static int accept_sec_context(char *buf, int index, ei_x_buff *presult)
 {
     ei_x_buff result = *presult;
 
     do {
-	    /* {negotiate, Base64} */
+	    /* {accept_sec_context, Base64} */
 
-	    int type = 0;
-	    int len = 0;
-	    long llen;
 	    gss_buffer_desc in;
 	    gss_buffer_desc out;
 	    gss_buffer_desc name;
 	    int res;
 	    char *ccname = NULL;
 
-	    if (ei_get_type(buf, &index, &type, &len)) return 5;
-
-	    if (type != ERL_BINARY_EXT) return 6;
-
-	    in.length = len;
-	    in.value = alloca(len);
-
-	    llen = len;
-
-	    if (ei_decode_binary(buf, &index, in.value, &llen)) return 6;
-
-	    in.length = llen;
+	    if (decode_gssapi_binary(buf, &index, &in)) return 6;
 
 	    memset(&out, 0, sizeof(out));
 	    memset(&name, 0, sizeof(name));
 
-	    res = authenticate_user(&in, &out, &name, &ccname);
+	    res = accept_user(&in, &out, &name, &ccname);
 
-	    /* TODO release out and name */
+	    /* TODO release in, out and name */
 
-	    if (res == OK) {
-	        const char *ret_ccname = ccname;
-		if (!ret_ccname)
-		    ret_ccname = "";
+	    if (!GSS_ERROR(res)) {
+		if (res & GSS_S_CONTINUE_NEEDED) {
+		    if (ei_x_encode_atom(&result, "needsmore") ||
+			ei_x_encode_binary(&result, out.value, out.length)
+			) return 8;
+		} else {
+		    const char *ret_ccname = ccname;
+		    if (!ret_ccname)
+			ret_ccname = "";
 
-		if (ei_x_encode_atom(&result, "ok") ||
-		    ei_x_encode_tuple_header(&result, 3) ||
-		    ei_x_encode_string_len(&result, name.value, name.length) ||
-		    ei_x_encode_string(&result, ret_ccname) ||
-		    ei_x_encode_binary(&result, out.value, out.length)
-		    ) return 8;
+		    if (ei_x_encode_atom(&result, "ok") ||
+			ei_x_encode_tuple_header(&result, 3) ||
+			ei_x_encode_string_len(&result, name.value, name.length) ||
+			ei_x_encode_string(&result, ret_ccname) ||
+			ei_x_encode_binary(&result, out.value, out.length)
+			) return 8;
 
-		if (ccname) {
-		    free(ccname);
-		    ccname = NULL;
+		    if (ccname) {
+			free(ccname);
+			ccname = NULL;
+		    }
 		}
 	    } else {
 		if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "unauthorized"))
@@ -331,6 +339,54 @@ error:
     return 0;
 }
 
+static int init_sec_context(char *buf, int index, ei_x_buff *presult)
+{
+    ei_x_buff result = *presult;
+
+    do {
+	/* {init_sec_context, {Service, Host, Base64}} */
+
+	int arity;
+	gss_buffer_desc in;
+	gss_buffer_desc out;
+	int res;
+	char *service = NULL;
+	char *hostname = NULL;
+	
+	if (ei_decode_tuple_header(buf, &index, &arity)) return 2;
+    
+	if (arity != 3) return 3;
+
+	DECODE_STRING(&service);
+	DECODE_STRING(&hostname);
+
+	if (decode_gssapi_binary(buf, &index, &in)) return 6;
+
+	memset(&out, 0, sizeof(out));
+
+	res = init_user(service, hostname, &in, &out);
+
+	/* TODO release out */
+
+	free(service);
+	free(hostname);
+
+	if (!GSS_ERROR(res)) {
+	    const char *status = (res & GSS_S_CONTINUE_NEEDED)?"needsmore":"ok";
+	    if (ei_x_encode_atom(&result, status) ||
+		ei_x_encode_binary(&result, out.value, out.length)
+		) return 8;
+
+	} else {
+	    if (ei_x_encode_atom(&result, "error") || ei_x_encode_long(&result, res))
+		return 9;
+	}
+    } while(0);
+
+error:
+    *presult = result;
+    return 0;
+}
 
 #define BUF_SIZE 128 
 
@@ -341,11 +397,6 @@ int main(int argc, char *argv[])
 {
     byte*     buf;
     int       size = BUF_SIZE;
-    char      command[MAXATOMLEN];
-    int       index, version, arity;
-    ei_x_buff result;
-    int fd;
-    int i;
 
     if (argc > 1) {
 	test(argc, argv);
@@ -357,14 +408,20 @@ int main(int argc, char *argv[])
     if ((buf = malloc(size)) == NULL)
 	return -1;
     
-    while (read_cmd(buf, &size) > 0) {
-	/* Reset the index, so that ei functions can decode terms from the 
-	 * beginning of the buffer */
-	index = 0;
+    while ( (buf = read_cmd(buf, &size)) ) {
+	int res = 0;
+	int index = 0;
+	int version, arity;
+	char command[MAXATOMLEN];
+	ei_x_buff result;
+
+/* 	fprintf(stderr, "Size: %d\n", size); */
 
 	/* Ensure that we are receiving the binary term by reading and 
 	 * stripping the version byte */
-	if (ei_decode_version(buf, &index, &version)) return 1;
+/* 	if (ei_decode_version(buf, &index, &version)) return 1; */
+	res = ei_decode_version(buf, &index, &version);
+	if (res) { fprintf(stderr, "Err: %d\n", res); return 1; }
     
 	/* Our marshalling spec is that we are expecting a tuple {Command, Arg1, Arg2} */
 	if (ei_decode_tuple_header(buf, &index, &arity)) return 2;
@@ -372,12 +429,16 @@ int main(int argc, char *argv[])
 	if (arity != 2) return 3;
     
 	if (ei_decode_atom(buf, &index, command)) return 4;
+
+/* 	fprintf(stderr, "Command: %s\n", command); */
     
 	/* Prepare the output buffer that will hold {ok, Result} or {error, Reason} */
 	if (ei_x_new_with_version(&result) || ei_x_encode_tuple_header(&result, 2)) return 5;
     
-	if (!strcmp("negotiate", command)) {
-	    negotiate(buf, index, &result);
+	if (!strcmp("accept_sec_context", command)) {
+	    if (accept_sec_context(buf, index, &result)) return 6;
+	} else if (!strcmp("init_sec_context", command)) {
+	    if (init_sec_context(buf, index, &result)) return 7;
 	} else {
 	    if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "unsupported_command")) 
 		return 99;
@@ -387,10 +448,35 @@ int main(int argc, char *argv[])
 
 	ei_x_free(&result);
 
-	size = BUF_SIZE;
+/* 	size = BUF_SIZE; */
     }
 
-    fprintf(stderr, "No more command, exiting\n");
+    fprintf(stderr, "No more command, exiting\r\n");
+
+    return 0;
+}
+
+static int
+decode_gssapi_binary(char *buf, int *index, gss_buffer_desc *bin)
+{
+    int type = 0;
+    int len = 0;
+    long llen;
+
+    if (ei_get_type(buf, index, &type, &len)) return 5;
+
+    if (type != ERL_BINARY_EXT) return 6;
+
+    bin->length = len;
+    bin->value = malloc(len);
+
+    llen = len;
+
+    if (ei_decode_binary(buf, index, bin->value, &llen)) return 6;
+
+    bin->length = llen;
+
+/*     fprintf(stderr, "decode_gssapi_binary ok\n"); */
 
     return 0;
 }

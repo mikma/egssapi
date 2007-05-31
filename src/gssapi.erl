@@ -13,7 +13,8 @@
 -export([
 	 start/0,
 	 stop/0,
-	 negotiate/1
+	 accept_sec_context/1,
+	 init_sec_context/3
 	]).
 
 %% gen_server callbacks
@@ -22,7 +23,8 @@
 
 % Internal exports
 -export([start_link/1,
-	 call_port/1]).
+	 call_port/1,
+	 test/0]).
 
 -define(GSSAPI_DRV, "gssapi_drv").
 -define(SERVER, ?MODULE).
@@ -59,12 +61,12 @@ start_link(KeyTab, ExtPrg) ->
 stop() ->
     gen_server:cast(?SERVER, stop).
 
-negotiate(Base64) when is_list(Base64) ->
+accept_sec_context(Base64) when is_list(Base64) ->
     Data = base64:decode(Base64),
-    negotiate(Data);
-negotiate(Data) when is_binary(Data) ->
-    Result = call_port({negotiate, Data}),
-%%     io:format("negotiate Result ~p~n", [Result]),
+    accept_sec_context(Data);
+accept_sec_context(Data) when is_binary(Data) ->
+    Result = call_port({accept_sec_context, Data}),
+%%     io:format("accept_sec_context Result ~p~n", [Result]),
 
     case Result of
 	{ok, {User, Ccname, Resp}} ->
@@ -72,6 +74,11 @@ negotiate(Data) when is_binary(Data) ->
 	{error, Reason} ->
 	    {error, Reason}
     end.
+
+init_sec_context(Service, Hostname, Data) when is_list(Service),
+					       is_list(Hostname),
+					       is_binary(Data) ->
+    call_port({init_sec_context, {Service, Hostname, Data}}).
 
 %%====================================================================
 %% gen_server callbacks
@@ -173,6 +180,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 
 call_port(Msg) ->
+%%     io:format("Call port ~p~n", [Msg]),
     Result = gen_server:call(?MODULE, {call, Msg}),
-    io:format("Result ~p~n", [Result]),
+%%     io:format("Result ~p~n", [Result]),
     Result.
+
+test() ->
+    start_link("/home/mikael/src/erlang/yaws/http.keytab"),
+%%     init_sec_context("HTTP", "skinner.hem.za.org",list_to_binary(lists:duplicate(1096, 17))),
+    {ok, Data2}=init_sec_context("HTTP", "skinner.hem.za.org",<<>>),
+%%     accept_sec_context(Data),
+    {ok, {User, Ccname, Out}} = accept_sec_context(Data2),
+    io:format("User authenticated: ~s~n", [User]),
+    ok.

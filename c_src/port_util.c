@@ -4,6 +4,22 @@
 
 #include "port_util.h"
 
+int decode_string(char *buf, int *index, char **str)
+{
+    int type;
+    int len;
+
+    *str = NULL;
+
+    if (ei_get_type(buf, index, &type, &len)) return 5;
+
+    *str = malloc(len);
+
+    if (ei_decode_string(buf, index, *str)) return 8;
+
+    return 0;
+}
+
 /*-----------------------------------------------------------------
  * Data marshalling functions
  *----------------------------------------------------------------*/
@@ -53,6 +69,7 @@ int read_exact(byte *buf, int len)
 	got += i;
     } while (got<len);
 
+/*     fprintf(stderr, "read_exact: %d\n", len); */
     return len;
 }
 

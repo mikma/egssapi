@@ -1,17 +1,23 @@
 %%%-------------------------------------------------------------------
 %%% File    : spnego.erl
 %%% Author  : Mikael Magnusson <mikael@skinner.hem.za.org>
-%%% Description : 
+%%% Description : SPNEGO wrapper around GSSAPI
 %%%
 %%% Created :  3 May 2007 by Mikael Magnusson <mikael@skinner.hem.za.org>
 %%%-------------------------------------------------------------------
 
-% TODO return SPNEGO responses
 % Documented in RFC 2743 section 3.1
 % asn1ct:compile("SPNEGOASNOne",[ber])
 -module(spnego).
 
--export([decode/1, test/0]).
+%% -compile([export_all]).
+
+%% API
+-export([accept_sec_context/1,
+	 init_sec_context/3]).
+
+%% Internal exports
+-export([]).
 
 -define(TAG_APP_SEQ, 16#60).
 -define(TAG_OID, 16#06).
@@ -23,44 +29,124 @@
 
 -define('RT_BER',asn1rt_ber_bin).
 
-decode(Data) when is_list(Data) ->
-    decode(base64:decode(Data));
-decode(Data) ->
-    <<Debug:32/binary, _/binary>> = Data,
-    io:format("Debug ~p~n", [Debug]),
+%%====================================================================
+%% API
+%%====================================================================
 
-    <<?TAG_APP_SEQ, Rest/binary>> = Data,
-    {Length, _, Rest2} = get_length(Rest),
-    io:format("Length ~p~n", [Length]),
-    {Oid, Blob} = get_oid(Rest2, Length),
-    io:format("decode~n", []),
+%%--------------------------------------------------------------------
+%% Function: accept_sec_context(Data)
+%%           Data = list() | binary(), SPNEGO data, base64 or binary
+%% Descrip.: Start gsasl port driver 
+%% Returns : {ok, {User, Ccname, Resp}} | {needsmore, Resp} |
+%%           {error, Error}
+%%           User = list(), authenticated principal
+%%           Ccname = list(), credential cache env
+%%           Resp = binary(), SPNEGO response
+%%--------------------------------------------------------------------
+accept_sec_context(Data) when is_list(Data) ->
+    accept_sec_context(base64:decode(Data));
+accept_sec_context(Data) ->
+    {Mode, Token} = decode(Data),
+    accept_sec_context(Mode, Data, Token).
 
-    io:format("OID ~p~n", [Oid]),
-    decode_token(Oid, Blob, Data).
+accept_sec_context(krb5, Data, _Token) ->
+    io:format("Krb5 accept~n", []),
+    gssapi:accept_sec_context(Data);    
+accept_sec_context(spnego, _Data, {negTokenInit, {'NegTokenInit', _Types, _ReqFlags, Token, _ListMIC}}) ->
+    io:format("negTokenInit~n", []),
+    {Status, {User,Ccname,Resp}} = gssapi:accept_sec_context(list_to_binary(Token)),
     
+    Neg_state =
+	case Status of
+	    ok ->
+		'accept-completed';
+	    needsmore ->
+		'accept-incomplete';
+	    error ->
+		'reject'
+	end,
 
-decode_token(?OID_KRB5, Blob, Data) ->
+    Spnego = {negTokenResp, {'NegTokenResp', Neg_state, asn1_NOVALUE, Resp, asn1_NOVALUE}},
+    {Status, {User, Ccname, encode_spnego(Spnego)}}.
+
+%%--------------------------------------------------------------------
+%% Function: init_sec_context(Mech, Service, Hostname)
+%%           Mech = atom(), SPNEGO mechanism (krb5 or spnego)
+%%           Service = list(), service name (ex. "HTTP")
+%%           Hostname = list(), hostname
+%% Descrip.: 
+%% Returns : {ok, Resp} | {needsmore, Resp} |
+%%           {error, Error}
+%%           Resp = binary(), SPNEGO response
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
+init_sec_context(Mech, Service, Hostname) when is_atom(Mech) ->
+    init_sec_context(Mech, {Service, Hostname}, <<>>, undefined);
+
+init_sec_context(Service, Hostname, Data) when is_list(Data) ->
+    init_sec_context(Service, Hostname, base64:decode(Data));
+init_sec_context(Service, Hostname, Data) ->
+    {Mode, Token} = decode(Data),
+    init_sec_context(Mode, {Service, Hostname}, Data, Token).
+
+init_sec_context(krb5, {Service, Hostname}, Data, _Token) ->
+    io:format("Krb5 init~n", []),
+    gssapi:init_sec_context(Service, Hostname, Data);
+init_sec_context(spnego, {Service, Hostname}, _Data, undefined) ->
+    init_sec_context_spnego({Service, Hostname}, <<>>);
+init_sec_context(spnego, {Service, Hostname}, _Data, {negTokenInit, {'NegTokenInit', _Types, _ReqFlags, Token, _ListMIC}}) ->
+    init_sec_context_spnego({Service, Hostname}, list_to_binary(Token)).
+
+init_sec_context_spnego({Service, Hostname}, Token) ->
+    io:format("negTokenInit~n", []),
+    case gssapi:init_sec_context(Service, Hostname, Token) of
+	{error, Reason} ->
+	    {error, Reason};
+	{Status, Init} ->
+	    Spnego = {negTokenInit, {'NegTokenInit', [?OID_KRB5], asn1_NOVALUE, Init, asn1_NOVALUE}},
+	    {Status, encode_spnego(Spnego)}
+    end.
+
+
+%%====================================================================
+%% Internal functions
+%%====================================================================
+decode(Data) when is_binary(Data) ->
+    {Oid, Blob} = decode_gssapi(Data),
+    decode_token(Oid, Blob).
+
+decode_token(?OID_KRB5, Blob) when is_binary(Blob) ->
     io:format("Krb5~n", []),
-    gssapi:negotiate(Data);
-decode_token(?OID_SPNEGO, Blob, _Data) ->
+    {krb5, Blob};
+decode_token(?OID_SPNEGO, Blob) when is_binary(Blob) ->
     io:format("SPNEGO~n", []),
     decode_spnego(Blob).
 
-decode_spnego(Blob) ->
+decode_spnego(Blob) when is_binary(Blob) ->
     {ok, NegotiationToken} = 'SPNEGOASNOneSpec':decode('NegotiationToken', Blob),
-    handle_spnego(NegotiationToken).
+    {spnego, NegotiationToken}.
 
-handle_spnego({negTokenInit, {'NegTokenInit', _Types, _ReqFlags, Token, _ListMIC}}) ->
-    io:format("negTokenInit~n", []),
-    gssapi:negotiate(list_to_binary(Token));
-handle_spnego({negTokenResp, {'NegTokenResp', NegState, _Type, Token, _ListMIC}}) ->
-    io:format("negTokenResp:~n", []),
-    handle_spnego_resp(NegState, Token).
+encode_spnego(Spnego) when is_tuple(Spnego) ->
+    {ok, Spnego_data} = 'SPNEGOASNOneSpec':encode('NegotiationToken', Spnego),
+    encode_gssapi(?OID_SPNEGO, list_to_binary(Spnego_data)).
 
-handle_spnego_resp('accept-completed', Token) ->
-    Token.
+decode_gssapi(Data) when is_binary(Data) ->
+    <<?TAG_APP_SEQ, Rest/binary>> = Data,
+    {Length, _, Rest2} = decode_length(Rest),
+    io:format("Length ~p~n", [Length]),
+    {Oid, Blob} = decode_oid(Rest2),
+    io:format("decode~n", []),
 
-get_length(Data) ->
+    io:format("OID ~p~n", [Oid]),
+    {Oid, Blob}.
+
+encode_gssapi(Oid, Token) when is_tuple(Oid),
+			       is_binary(Token)->
+    Oid_bin = encode_oid(Oid),
+    Length_bin = encode_length(size(Token)+size(Oid_bin)),
+    <<?TAG_APP_SEQ, Length_bin/binary, Oid_bin/binary, Token/binary>>.
+
+decode_length(Data) when is_binary(Data) ->
     <<B, Rest/binary>> = Data,
     if B < 128 ->
 	    {B, 1, Rest};
@@ -71,39 +157,85 @@ get_length(Data) ->
 	    {Len, 1 + Size_len, Rest2}
     end.
 
+encode_length(Data) when is_binary(Data) ->
+    encode_length(size(Data));
+encode_length(Len) when is_number(Len) ->
+    if Len < 128 ->
+	    << Len >>;
+       Len >= 128 ->
+	    Size_len = calc_octets(Len),
+	    Bits = Size_len*8,
+	    << (Size_len+128), Len:Bits/big >>
+		end.
 
-get_oid(Data, Length) ->
-    <<?TAG_OID, Rest1/binary>> = Data,
-    case length(binary_to_list(Rest1)) of
-	Length ->
-	    ok;
-	Length2 ->
-	    io:format("Length no match ~p ~p~n", [Length, Length2])
-    end,
-    {Oid_len, Size_len, Rest2} = get_length(Rest1),
-    io:format("Length ~p ~p~n", [Oid_len, Size_len]),
-    Oid_len2 = Oid_len + Size_len + 1,
-    <<Oid:Oid_len2/binary, Blob/binary>> = Data,
 
-    io:format("Raw OID ~p~n", [Oid]),
-    {Oid_dec, <<>>, _} = ?RT_BER:decode_object_identifier(Oid, [], []),
+calc_octets(Len) when is_number(Len), Len > -1 ->
+    calc_octets(Len, 0).
 
+calc_octets(0, Octets) ->
+    Octets;
+    
+calc_octets(Len, Octets) ->
+    calc_octets(Len bsr 8, Octets + 1).
+    
+
+decode_oid(Data) when is_binary(Data) ->
+    {Oid_dec, Blob, _} = ?RT_BER:decode_object_identifier(Data, [], []),
     {Oid_dec, Blob}.
 
+encode_oid(Oid) when is_tuple(Oid) ->
+    {Oid_list, _} = ?RT_BER:encode_object_identifier(Oid, []),
+    list_to_binary(Oid_list).
+
+
+%%====================================================================
+%% Test functions
+%%====================================================================
+test4() ->
+    gssapi:start(),
+    {ok, Spnego} = spnego:init_sec_context(spnego, "HTTP", "skinner.hem.za.org"),    
+    spnego:decode(Spnego),
+    ok.
+
+test3() ->
+    gssapi:start(),
+%%     {ok, Spnego} = spnego:init_sec_context(krb5, "HTTP", "skinner.hem.za.org"),    
+    {ok, Spnego} = spnego:init_sec_context(spnego, "HTTP", "skinner.hem.za.org"),    
+%%     http:request(get, {"http://192.168.0.2/~mikael/kerberos", [{"Authorization", "Negotiate " ++ base64:encode_to_string(Spnego)}]},[],[]).
+    http:request(get, {"http://192.168.0.2/yaws", [{"Authorization", "Negotiate " ++ base64:encode_to_string(Spnego)}]},[],[]).
+
+
+test2() ->
+%%     3 = calc_octets(65536),
+%%     <<0>> = encode_length(<<>>),
+%%     <<5>> = encode_length(<<1,2,3,4,5>>),
+%%     <<131,1,0,0>> = spnego:encode_length(list_to_binary(lists:duplicate(65536, 1))),
+%%     Data = <<1,2,3,4>>,
+%%     {?OID_KRB5, Data} = decode_gssapi(encode_gssapi(?OID_KRB5, Data)),
+
+    gssapi:start_link("/home/mikael/src/erlang/yaws/http.keytab"),
+    {ok, Token2}=init_sec_context(krb5, "HTTP", "skinner.hem.za.org"),
+%%     io:format("krb5: ~p~n", [Token2]),
+    {ok,_}=accept_sec_context(Token2),
+    {ok, Token1}=init_sec_context(spnego, "HTTP", "skinner.hem.za.org"),
+%%     io:format("spnego: ~p~n", [Token1]),
+    {ok,_}=accept_sec_context(Token1),
+    ok.
+   
 
 test() ->
     Data3 = get_data(3),
-    decode(Data3),
+    accept_sec_context(Data3),
     throw(ok),
 
     Data0 = get_data(0),
-    decode(Data0),
+    accept_sec_context(Data0),
     Data1 = get_data(1),
-    decode(Data1),
+    accept_sec_context(Data1),
     Data2 = get_data(2),
-    decode(Data2),
+    accept_sec_context(Data2),
     {ok, Data3} = file:read_file("spnego_resp.dat"),
-    decode_spnego(Data3),
+%%     decode_spnego(accept, Data3, undefined),
     ok.
 
 get_data(0) ->

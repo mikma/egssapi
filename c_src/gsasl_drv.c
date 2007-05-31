@@ -138,24 +138,6 @@ void session_free(struct session *sess)
     free(sess);
 }
 
-int decode_string(char *buf, int *index, char **str)
-{
-    int type;
-    int len;
-
-    *str = NULL;
-
-    if (ei_get_type(buf, index, &type, &len)) return 5;
-
-    *str = malloc(len);
-
-    if (ei_decode_string(buf, index, *str)) return 8;
-
-    return 0;
-}
-
-#define DECODE_STRING(str) decode_string(buf, &index, str)
-
 static int callback_function(Gsasl *ctx, Gsasl_session *sctx,
 			     Gsasl_property prop)
 {
