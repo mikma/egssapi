@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% File    : spnego.erl
 %%% Author  : Mikael Magnusson <mikael@skinner.hem.za.org>
-%%% Description : SPNEGO wrapper around GSSAPI
+%%% Description : SPNEGO wrappers around GSSAPI
 %%%
 %%% Created :  3 May 2007 by Mikael Magnusson <mikael@skinner.hem.za.org>
 %%%-------------------------------------------------------------------
 
-% Documented in RFC 2743 section 3.1
+% Documented in RFC 4178 and RFC 2743 section 3.1
 % asn1ct:compile("SPNEGOASNOne",[ber])
 -module(spnego).
 
@@ -47,13 +47,24 @@ accept_sec_context(Data) when is_list(Data) ->
     accept_sec_context(base64:decode(Data));
 accept_sec_context(Data) ->
     {Mode, Token} = decode(Data),
-    accept_sec_context(Mode, Data, Token).
+    catch accept_sec_context(Mode, Data, Token).
 
 accept_sec_context(krb5, Data, _Token) ->
     io:format("Krb5 accept~n", []),
     gssapi:accept_sec_context(Data);    
-accept_sec_context(spnego, _Data, {negTokenInit, {'NegTokenInit', _Types, _ReqFlags, Token, _ListMIC}}) ->
+accept_sec_context(spnego, _Data, {negTokenInit, {'NegTokenInit', Types, _ReqFlags, Token, _ListMIC}}) ->
     io:format("negTokenInit~n", []),
+
+    case lists:member(?OID_KRB5, Types) of
+	false ->
+	    Spnego1 = {negTokenResp, {'NegTokenResp', reject, ?OID_KRB5, [], asn1_NOVALUE}},
+	    Resp1 = encode_spnego(Spnego1),
+%% 	    {Status, {User, Ccname, Resp1}},
+	    throw({error, unsupported_mech});
+	true ->
+	    ok
+    end,
+
     {Status, {User,Ccname,Resp}} = gssapi:accept_sec_context(list_to_binary(Token)),
     
     Neg_state =
@@ -66,7 +77,7 @@ accept_sec_context(spnego, _Data, {negTokenInit, {'NegTokenInit', _Types, _ReqFl
 		'reject'
 	end,
 
-    Spnego = {negTokenResp, {'NegTokenResp', Neg_state, asn1_NOVALUE, Resp, asn1_NOVALUE}},
+    Spnego = {negTokenResp, {'NegTokenResp', Neg_state, ?OID_KRB5, Resp, asn1_NOVALUE}},
     {Status, {User, Ccname, encode_spnego(Spnego)}}.
 
 %%--------------------------------------------------------------------

@@ -6,9 +6,8 @@ incdir = $(libsubdir)/include
 inc_HEADERS = $($(OPT_APP)_HDRS)
 beam_FILES = $($(OPT_APP)_SRCS:.erl=.beam)
 
-ebin_DATA = $(beam_FILES) $(OPT_APP:=.app) $(OPT_APP:=.boot)
-EXTRA_DIST = $($(OPT_APP)_SRCS) ../src/$(OPT_APP:=.app-in) ../src/$(OPT_APP:=.rel.in)
-CLEANFILES = $(beam_FILES) $(OPT_APP:=.app) $(OPT_APP:=.boot) $(OPT_APP:=.rel)	\
-$(OPT_APP:=.script)
+ebin_DATA = $(beam_FILES) $(OPT_APP:=.app)
+EXTRA_DIST = $($(OPT_APP)_SRCS) ../src/$(OPT_APP:=.app-in)
+CLEANFILES = $(beam_FILES) $(OPT_APP:=.app)
 
 include $(top_srcdir)/rules.mk

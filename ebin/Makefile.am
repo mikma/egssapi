@@ -11,9 +11,7 @@ gssapi_SRCS = \
 	../src/gsasl.erl \
 	../src/eldap_expr.erl \
 	SPNEGOASNOneSpec.erl \
-	../src/gssapi.erl \
-	../src/gssapi_app.erl \
-	../src/gssapi_sup.erl
+	../src/gssapi.erl
 
 # gssapi_HDRS =
 

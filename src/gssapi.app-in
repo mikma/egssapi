@@ -3,13 +3,12 @@
   {vsn,"@VSN@"},
   {modules, [
 	     'SPNEGOASNOneSpec',
+	     gsasl,
 	     gssapi,
-	     gssapi_app,
-	     gssapi_sup,
 	     spnego
 	    ]},
   {registered, []},
-  {mod, {gssapi_app, []}},
+%  {mod, {gssapi_app, []}},
   {env, []},
   {applications, [
 		  kernel,

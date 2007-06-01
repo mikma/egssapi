@@ -11,7 +11,9 @@
 
 %% API
 -export([
-	 start/0,
+	 start_link/0,
+	 start_link/1,
+	 start_link/2,
 	 stop/0,
 	 accept_sec_context/1,
 	 init_sec_context/3
@@ -42,21 +44,16 @@
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the server
 %%--------------------------------------------------------------------
-start() ->
-%%    KeyTab = filename:join(code:priv_dir(gssapi), "http.keytab"),
+start_link() ->
     KeyTab = "/etc/yaws/http.keytab",
     start_link(KeyTab).
 
-%% start(KeyTab) ->
-%%     supervisor:start_child(gssapi_sup, {gssapi, {gssapi, start_link, [KeyTab]}, permanent, 2000, worker, [gssapi]}).
-
 start_link(KeyTab) ->
-    Prog = filename:join(code:priv_dir(?APP), ?GSSAPI_DRV),
-    start_link(KeyTab, Prog).
-%%     start("/home/mikael/src/erlang/yaws/gssapi_drv").
+    start_link(KeyTab, "").
 
-start_link(KeyTab, ExtPrg) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [KeyTab, ExtPrg], []).
+start_link(KeyTab, Ccname) ->
+    ExtPrg = filename:join(code:priv_dir(?APP), ?GSSAPI_DRV),
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [KeyTab, ExtPrg, Ccname], []).
 
 stop() ->
     gen_server:cast(?SERVER, stop).
@@ -91,9 +88,21 @@ init_sec_context(Service, Hostname, Data) when is_list(Service),
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([KeyTab, ExtPrg]) ->
+init([KeyTab, ExtPrg, Ccname]) ->
     process_flag(trap_exit, true),
-    Env = {env, [{"KRB5_KTNAME", KeyTab}]},
+    KeyTabEnv =
+	if KeyTab =/= [] ->
+		[{"KRB5_KTNAME", KeyTab}];
+	   true ->
+		[]
+	end,
+    Ccname_env =
+	if Ccname =/= [] ->
+		[{"KRB5CCNAME", Ccname}];
+	   true ->
+		[]
+	end,
+    Env = {env, KeyTabEnv ++ Ccname_env},
     Port = open_port({spawn, ExtPrg}, [{packet, 2}, binary, exit_status, Env]),
     {ok, #state{port=Port}}.
 
