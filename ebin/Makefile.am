@@ -8,8 +8,6 @@ gssapi_VSN = 0.1
 
 gssapi_SRCS = \
 	../src/spnego.erl \
-	../src/gsasl.erl \
-	../src/eldap_expr.erl \
 	SPNEGOASNOneSpec.erl \
 	../src/gssapi.erl
 
