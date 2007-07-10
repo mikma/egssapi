@@ -5,6 +5,37 @@
 %%%
 %%% Created : 17 May 2007 by Mikael Magnusson <mikael@skinner.hem.za.org>
 %%%-------------------------------------------------------------------
+%%%
+%%% Copyright (c) 2007 Mikael Magnusson
+%%% All rights reserved. 
+%%%
+%%% Redistribution and use in source and binary forms, with or without 
+%%% modification, are permitted provided that the following conditions 
+%%% are met: 
+%%%
+%%% 1. Redistributions of source code must retain the above copyright 
+%%%    notice, this list of conditions and the following disclaimer. 
+%%%
+%%% 2. Redistributions in binary form must reproduce the above copyright 
+%%%    notice, this list of conditions and the following disclaimer in the 
+%%%    documentation and/or other materials provided with the distribution. 
+%%%
+%%% 3. Neither the name of the copyright owner nor the names of its
+%%%    contributors may be used to endorse or promote products derived from
+%%%    this software without specific prior written permission. 
+%%%
+%%% THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND 
+%%% ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+%%% IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+%%% ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE 
+%%% FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
+%%% DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS 
+%%% OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+%%% HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
+%%% LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+%%% OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+%%% SUCH DAMAGE. 
+%%%
 -module(gssapi).
 
 -behaviour(gen_server).
@@ -16,7 +47,9 @@
 	 start_link/2,
 	 stop/0,
 	 accept_sec_context/1,
-	 init_sec_context/3
+	 init_sec_context/3,
+	 wrap/3,
+	 unwrap/2
 	]).
 
 %% gen_server callbacks
@@ -24,8 +57,7 @@
 	 terminate/2, code_change/3]).
 
 % Internal exports
--export([start_link/1,
-	 call_port/1,
+-export([call_port/1,
 	 test/0]).
 
 -define(GSSAPI_DRV, "gssapi_drv").
@@ -62,12 +94,15 @@ accept_sec_context(Base64) when is_list(Base64) ->
     Data = base64:decode(Base64),
     accept_sec_context(Data);
 accept_sec_context(Data) when is_binary(Data) ->
-    Result = call_port({accept_sec_context, Data}),
+    accept_sec_context(-1, Data).
+
+accept_sec_context(Idx, Data) when is_integer(Idx), is_binary(Data) ->
+    Result = call_port({accept_sec_context, {Idx, Data}}),
 %%     io:format("accept_sec_context Result ~p~n", [Result]),
 
     case Result of
-	{ok, {User, Ccname, Resp}} ->
-	    {ok, {User, Ccname, base64:encode(Resp)}};
+	{ok, {Idx2, User, Ccname, Resp}} ->
+	    {ok, {Idx2, User, Ccname, base64:encode(Resp)}};
 	{error, Reason} ->
 	    {error, Reason}
     end.
@@ -75,7 +110,25 @@ accept_sec_context(Data) when is_binary(Data) ->
 init_sec_context(Service, Hostname, Data) when is_list(Service),
 					       is_list(Hostname),
 					       is_binary(Data) ->
-    call_port({init_sec_context, {Service, Hostname, Data}}).
+    init_sec_context(-1, Service, Hostname, Data).
+
+init_sec_context(Idx, Service, Hostname, Data) when is_integer(Idx),
+						    is_list(Service),
+						    is_list(Hostname),
+						    is_binary(Data) ->
+    call_port({init_sec_context, {Idx, Service, Hostname, Data}}).
+
+wrap(Idx, Conf_req_flag, Input) when is_integer(Idx),
+				     is_atom(Conf_req_flag),
+				     is_binary(Input) ->
+    call_port({wrap, {Idx, Conf_req_flag, Input}}).
+
+unwrap(Idx, Input) when is_integer(Idx),
+			is_binary(Input) ->
+    call_port({unwrap, {Idx, Input}}).
+
+delete_sec_context(Idx) when is_integer(Idx) ->
+    call_port({delete_sec_context, Idx}).
 
 %%====================================================================
 %% gen_server callbacks
@@ -195,10 +248,32 @@ call_port(Msg) ->
     Result.
 
 test() ->
+    io:format("~p: test 1~n", [?MODULE]),
     start_link("/home/mikael/src/erlang/yaws/http.keytab"),
-%%     init_sec_context("HTTP", "skinner.hem.za.org",list_to_binary(lists:duplicate(1096, 17))),
-    {ok, Data2}=init_sec_context("HTTP", "skinner.hem.za.org",<<>>),
-%%     accept_sec_context(Data),
-    {ok, {User, Ccname, Out}} = accept_sec_context(Data2),
+
+    io:format("~p: test 2~n", [?MODULE]),
+    {ok, {Idx, Data}}=init_sec_context("HTTP", "skinner.hem.za.org",<<>>),
+
+    io:format("~p: test 4~n", [?MODULE]),
+    {ok, {Idx2, User, Ccname, Out}} = accept_sec_context(Data),
+
     io:format("User authenticated: ~s~n", [User]),
+    io:format("Test wrap~n", []),
+
+    io:format("~p: test 5~n", [?MODULE]),
+    {ok, {false, Out3}} = wrap(Idx, false, <<"Hello World">>),
+    io:format("Wrap ~p~n", [Out3]),
+
+    io:format("~p: test 6~n", [?MODULE]),
+    {ok, {false, <<"Hello World">>=Out4}} = unwrap(Idx2, Out3),
+    io:format("Unwrap ~s~n", [Out4]),
+
+    io:format("~p: test 7~n", [?MODULE]),
+    {ok, done} = delete_sec_context(Idx),
+
+    io:format("~p: test 8~n", [?MODULE]),
+    {ok, done} = delete_sec_context(Idx2),
+
+    io:format("~p: test 9~n", [?MODULE]),
+    {error, _} = wrap(Idx, false, <<"Hello World">>),
     ok.
