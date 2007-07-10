@@ -11,8 +11,7 @@ gssapi_SRCS = \
 
 # gssapi_HDRS =
 
-AM_ERLCFLAGS = -I$(top_builddir)/include -I$(srcdir)    \
--I$(ERLANG_LIB_DIR_xmerl)/include
+AM_ERLCFLAGS = -I$(srcdir) +debug_info
 AM_ERL_FLAGS =
 
 CLEANFILES += SPNEGOASNOneSpec.asn1db SPNEGOASNOneSpec.erl	\

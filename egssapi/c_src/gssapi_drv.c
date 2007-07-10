@@ -234,7 +234,7 @@ accept_user(gss_ctx_id_t *ctx,
 	if (m && m->save_cred)
 	    (*m->save_cred)(name->value, delegated_cred_handle, pccname);
     } else {
-	fprintf(stderr, "Not delegated\r\n");
+/* 	fprintf(stderr, "Not delegated\r\n"); */
     }
 
  out:
@@ -454,7 +454,8 @@ static int init_sec_context(char *buf, int index, ei_x_buff *presult)
     ei_x_buff result = *presult;
 
     /*
-      {init_sec_context, {Idx, Service, Host, Input}} -> {
+      {init_sec_context, {Idx, Service, Host, Input}} ->
+       {ok, {Idx, Data}} | {error, Error}
     */
 
     int arity;

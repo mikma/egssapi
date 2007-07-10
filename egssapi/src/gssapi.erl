@@ -45,11 +45,13 @@
 	 start_link/0,
 	 start_link/1,
 	 start_link/2,
-	 stop/0,
-	 accept_sec_context/1,
-	 init_sec_context/3,
+	 start_link/3,
+	 stop/1,
+	 accept_sec_context/2,
+	 init_sec_context/4,
 	 wrap/3,
-	 unwrap/2
+	 unwrap/2,
+	 delete_sec_context/1
 	]).
 
 %% gen_server callbacks
@@ -57,12 +59,36 @@
 	 terminate/2, code_change/3]).
 
 % Internal exports
--export([call_port/1,
+-export([call_port/2,
 	 test/0]).
+
+-include_lib("kernel/include/inet.hrl").
 
 -define(GSSAPI_DRV, "gssapi_drv").
 -define(SERVER, ?MODULE).
 -define(APP, egssapi).
+
+%%-define(ENABLE_DEBUG, yes).
+
+-ifdef(ENABLE_DEBUG).
+-define(INFO, io:format).
+-define(DEBUG, io:format).
+%% -define(WARNING, io:format).
+%% -define(ERROR, io:format).
+-else.
+-define(INFO, ignore).
+-define(DEBUG, ignore).
+%% -define(WARNING, ignore).
+%% -define(ERROR, ignore).
+-endif.
+
+-define(WARNING, io:format).
+-define(ERROR, io:format).
+
+-record(context, {
+	  server_ref,				% pid()|atom()
+	  index=-1				% integer()
+	  }).
 
 -record(state, {
 	  port,
@@ -73,62 +99,133 @@
 %% API
 %%====================================================================
 %%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the server
+%% Function: start_link([Server_name], [KeyTab, [Ccname]])
+%%           Server_name = {local, Name} | {global, Name}
+%%           Name = atom()
+%%           KeyTab = string(), Keytab filename
+%%           Ccname = string(), Credential cache filename
+%% Returns:  {ok,Pid} | ignore | {error,Error}
+%% Description: Starts the GSSAPI port server
 %%--------------------------------------------------------------------
 start_link() ->
-    KeyTab = "/etc/yaws/http.keytab",
-    start_link(KeyTab).
+    start_link("").
 
 start_link(KeyTab) ->
     start_link(KeyTab, "").
 
-start_link(KeyTab, Ccname) ->
-    ExtPrg = filename:join(code:priv_dir(?APP), ?GSSAPI_DRV),
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [KeyTab, ExtPrg, Ccname], []).
+start_link(KeyTab, Ccname) when is_list(KeyTab),
+				is_list(Ccname) ->
+    gen_server:start_link(?MODULE, [KeyTab, Ccname], []);
+start_link(Server_name, KeyTab) ->
+    start_link(Server_name, KeyTab, "").
 
-stop() ->
-    gen_server:cast(?SERVER, stop).
+start_link(Server_name, KeyTab, Ccname) ->
+    gen_server:start_link(Server_name, ?MODULE, [KeyTab, Ccname], []).
 
-accept_sec_context(Base64) when is_list(Base64) ->
-    Data = base64:decode(Base64),
-    accept_sec_context(Data);
-accept_sec_context(Data) when is_binary(Data) ->
-    accept_sec_context(-1, Data).
+%%--------------------------------------------------------------------
+%% Function: stop(Server_ref)
+%%           Server_ref = pid() | atom()
+%% Returns:  ok
+%% Description: Stop the GSSAPI port server
+%%--------------------------------------------------------------------
+stop(Server_ref) ->
+    gen_server:cast(Server_ref, stop).
 
-accept_sec_context(Idx, Data) when is_integer(Idx), is_binary(Data) ->
-    Result = call_port({accept_sec_context, {Idx, Data}}),
+
+%%--------------------------------------------------------------------
+%% Function: accept_sec_context(Server_ref|Context, Data) 
+%%           Server_ref = pid() | atom(), pid or registered server name
+%%           Context = context record(), security context
+%%           Data = binary(), GSSAPI data
+%% Descrip.: Start gsasl port driver 
+%% Returns : {ok, {Context, User, Ccname, Resp}} |
+%%           {needsmore, {Context, Resp}} |
+%%           {error, Error}
+%%           Context = context record(), security context
+%%           User = list(), authenticated principal
+%%           Ccname = list(), credential cache env
+%%           Resp = binary(), GSSAPI response
+%%--------------------------------------------------------------------
+accept_sec_context(Context, Data) when is_binary(Data) ->
+    Idx = lookup_index(Context),
+    Result = call_port(Context, {accept_sec_context, {Idx, Data}}),
 %%     io:format("accept_sec_context Result ~p~n", [Result]),
 
     case Result of
 	{ok, {Idx2, User, Ccname, Resp}} ->
-	    {ok, {Idx2, User, Ccname, base64:encode(Resp)}};
+	    {ok, {set_index(Context, Idx2), User, Ccname, Resp}};
+	{needsmore, {Idx2, Resp}} ->
+	    {needsmore, {set_index(Context, Idx2), Resp}};
 	{error, Reason} ->
 	    {error, Reason}
     end.
 
-init_sec_context(Service, Hostname, Data) when is_list(Service),
-					       is_list(Hostname),
-					       is_binary(Data) ->
-    init_sec_context(-1, Service, Hostname, Data).
+%%--------------------------------------------------------------------
+%% Function: init_sec_context(Server_ref|Context, Service, Hostname, Data)
+%%           Server_ref = pid() | atom(), pid or registered server name
+%%           Context = context record(), security context
+%%           Service = list(), service name (ex. "HTTP")
+%%           Hostname = list(), hostname
+%%           Data = binary(), GSSAPI data
+%% Descrip.: 
+%% Returns : {ok, {Context, Resp}} | {needsmore, {Context, Resp}} |
+%%           {error, Error}
+%%           Context = context record(), security context
+%%           Resp = binary(), GSSAPI response
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
+init_sec_context(Context, Service, Hostname, Data) when is_list(Service),
+							is_list(Hostname),
+							is_binary(Data) ->
+    Idx = lookup_index(Context),
+    case call_port(Context, {init_sec_context, {Idx, Service, Hostname, Data}}) of
+	{Status, {Idx2, Resp}} ->
+	    {Status, {set_index(Context, Idx2), Resp}};
+	{error, Reason} ->
+	    {error, Reason}
+    end.
 
-init_sec_context(Idx, Service, Hostname, Data) when is_integer(Idx),
-						    is_list(Service),
-						    is_list(Hostname),
-						    is_binary(Data) ->
-    call_port({init_sec_context, {Idx, Service, Hostname, Data}}).
+%%--------------------------------------------------------------------
+%% Function: wrap(Context, Conf_req_flag, Input) 
+%%           Context = context record(), security context
+%%           Conf_req_flag = binary(), confidentiality requested
+%%           Input = binary(), data to wrap
+%% Descrip.: Sign and possible encrypt data
+%% Returns : {ok, {Conf_state, Output}} | {error, Error}
+%%           Conf_state = boolean(), confidentiality state
+%%           Output = binary(), output
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
+wrap(Context, Conf_req_flag, Input) when is_atom(Conf_req_flag),
+					 is_binary(Input) ->
+    Idx = lookup_index(Context),
+    call_port(Context, {wrap, {Idx, Conf_req_flag, Input}}).
 
-wrap(Idx, Conf_req_flag, Input) when is_integer(Idx),
-				     is_atom(Conf_req_flag),
-				     is_binary(Input) ->
-    call_port({wrap, {Idx, Conf_req_flag, Input}}).
+%%--------------------------------------------------------------------
+%% Function: unwrap(Context, Input) 
+%%           Context = context record(), security context
+%%           Input = binary(), data to wrap
+%% Descrip.: Verify sign and possible decrypt data
+%% Returns : {ok, {Conf_state, Output}} | {error, Error}
+%%           Conf_state = boolean(), confidentiality state
+%%           Output = binary(), output
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
+unwrap(Context, Input) when is_binary(Input) ->
+    Idx = lookup_index(Context),
+    call_port(Context, {unwrap, {Idx, Input}}).
 
-unwrap(Idx, Input) when is_integer(Idx),
-			is_binary(Input) ->
-    call_port({unwrap, {Idx, Input}}).
 
-delete_sec_context(Idx) when is_integer(Idx) ->
-    call_port({delete_sec_context, Idx}).
+%%--------------------------------------------------------------------
+%% Function: delete_sec_context(Context) 
+%%           Context = context record(), security context
+%% Descrip.: Delete security context
+%% Returns : {ok, done} | {error, Error}
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
+delete_sec_context(Context) ->
+    Idx = lookup_index(Context),
+    call_port(Context, {delete_sec_context, Idx}).
 
 %%====================================================================
 %% gen_server callbacks
@@ -141,7 +238,8 @@ delete_sec_context(Idx) when is_integer(Idx) ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([KeyTab, ExtPrg, Ccname]) ->
+init([KeyTab, Ccname]) ->
+    ExtPrg = filename:join(code:priv_dir(?APP), ?GSSAPI_DRV),
     process_flag(trap_exit, true),
     KeyTabEnv =
 	if KeyTab =/= [] ->
@@ -241,39 +339,78 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-call_port(Msg) ->
+call_port(Context, Msg) ->
+    Server_ref = lookup_server(Context),
 %%     io:format("Call port ~p~n", [Msg]),
-    Result = gen_server:call(?MODULE, {call, Msg}),
+    Result = gen_server:call(Server_ref, {call, Msg}),
 %%     io:format("Result ~p~n", [Result]),
     Result.
 
+lookup_server(Context) when is_record(Context, context) ->
+    Context#context.server_ref;
+lookup_server(Context) when is_atom(Context); is_pid(Context) ->
+    Context.
+
+lookup_index(Context) when is_record(Context, context) ->
+    Context#context.index;
+lookup_index(_Context) ->
+    -1.
+
+set_index(Context, Idx) when is_record(Context, context) ->
+    Context#context{index=Idx};
+set_index(Server_ref, Idx) when is_atom(Server_ref); is_pid(Server_ref) ->
+    #context{server_ref=Server_ref, index=Idx}.
+
 test() ->
     io:format("~p: test 1~n", [?MODULE]),
-    start_link("/home/mikael/src/erlang/yaws/http.keytab"),
+    {ok, Server}=start_link("http.keytab"),
 
     io:format("~p: test 2~n", [?MODULE]),
-    {ok, {Idx, Data}}=init_sec_context("HTTP", "skinner.hem.za.org",<<>>),
+    {ok, {Ctx, Data}}=init_sec_context(Server, "HTTP", gethostname(),<<>>),
 
     io:format("~p: test 4~n", [?MODULE]),
-    {ok, {Idx2, User, Ccname, Out}} = accept_sec_context(Data),
+    {ok, {Ctx2, User, _Ccname, _Out}} = accept_sec_context(Server, Data),
 
     io:format("User authenticated: ~s~n", [User]),
     io:format("Test wrap~n", []),
 
     io:format("~p: test 5~n", [?MODULE]),
-    {ok, {false, Out3}} = wrap(Idx, false, <<"Hello World">>),
+    {ok, {false, Out3}} = wrap(Ctx, false, <<"Hello World">>),
     io:format("Wrap ~p~n", [Out3]),
 
     io:format("~p: test 6~n", [?MODULE]),
-    {ok, {false, <<"Hello World">>=Out4}} = unwrap(Idx2, Out3),
+    {ok, {false, <<"Hello World">>=Out4}} = unwrap(Ctx2, Out3),
     io:format("Unwrap ~s~n", [Out4]),
 
+    io:format("~p: test 6.1~n", [?MODULE]),
+    {ok, {true, Out5}} = wrap(Ctx, true, <<"Hello World">>),
+    io:format("Wrap ~p~n", [Out5]),
+
+    io:format("~p: test 6.2~n", [?MODULE]),
+    {ok, {true, <<"Hello World">>=Out6}} = unwrap(Ctx2, Out5),
+    io:format("Unwrap ~s~n", [Out6]),
+
     io:format("~p: test 7~n", [?MODULE]),
-    {ok, done} = delete_sec_context(Idx),
+    {ok, done} = delete_sec_context(Ctx),
 
     io:format("~p: test 8~n", [?MODULE]),
-    {ok, done} = delete_sec_context(Idx2),
+    {ok, done} = delete_sec_context(Ctx2),
 
     io:format("~p: test 9~n", [?MODULE]),
-    {error, _} = wrap(Idx, false, <<"Hello World">>),
+    {error, _} = wrap(Ctx, false, <<"Hello World">>),
+
+    stop(Server),
+
+    {ok, Server2}=start_link({local, gssapi_test}, "http.keytab"),
+    stop(Server2),
+
     ok.
+
+gethostname() ->
+    {ok, Name} = inet:gethostname(),
+    case inet:gethostbyname(Name) of
+	{ok, Hostent} when is_record(Hostent, hostent) ->
+	    Hostent#hostent.h_name;
+	_ ->
+	    Name
+    end.
