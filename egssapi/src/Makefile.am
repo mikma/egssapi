@@ -1,15 +1,15 @@
 include $(top_srcdir)/app.mk
 
-OPT_APP = gssapi
+OPT_APP = egssapi
 
-gssapi_VSN = 0.1
+egssapi_VSN = 0.1
 
-gssapi_SRCS = \
+egssapi_SRCS = \
 	spnego.erl \
 	SPNEGOASNOneSpec.erl \
-	gssapi.erl
+	egssapi.erl
 
-# gssapi_HDRS =
+# egssapi_HDRS =
 
 AM_ERLCFLAGS = -I$(srcdir) +debug_info
 AM_ERL_FLAGS =

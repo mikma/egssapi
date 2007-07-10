@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% File    : test.erl
+%%% File    : egssapi.erl
 %%% Author  : Mikael Magnusson <mikael@skinner.hem.za.org>
 %%% Description : 
 %%%
@@ -36,7 +36,7 @@
 %%% OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
 %%% SUCH DAMAGE. 
 %%%
--module(gssapi).
+-module(egssapi).
 
 -behaviour(gen_server).
 

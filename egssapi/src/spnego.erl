@@ -106,7 +106,7 @@ accept_sec_context(Context, Data) ->
 
 accept_sec_context(Context, krb5, Data, _Token) ->
     ?DEBUG("Krb5 accept~n", []),
-    gssapi:accept_sec_context(Context, Data);    
+    egssapi:accept_sec_context(Context, Data);    
 accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types, _ReqFlags, Token, _ListMIC}}) ->
     ?DEBUG("negTokenInit~n", []),
 
@@ -120,7 +120,7 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
 	    ok
     end,
 
-    {Status, {Context2,User,Ccname,Resp}} = gssapi:accept_sec_context(Context, list_to_binary(Token)),
+    {Status, {Context2,User,Ccname,Resp}} = egssapi:accept_sec_context(Context, list_to_binary(Token)),
     
     Neg_state =
 	case Status of
@@ -162,7 +162,7 @@ init_sec_context(Context, Service, Hostname, Data) ->
 
 init_sec_context(Context, krb5, {Service, Hostname}, Data, _Token) ->
     ?DEBUG("Krb5 init~n", []),
-    gssapi:init_sec_context(Context, Service, Hostname, Data);
+    egssapi:init_sec_context(Context, Service, Hostname, Data);
 init_sec_context(Context, spnego, {Service, Hostname}, _Data, undefined) ->
     init_sec_context_spnego(Context, {Service, Hostname}, <<>>);
 init_sec_context(Context, spnego, {Service, Hostname}, _Data, {negTokenInit, {'NegTokenInit', _Types, _ReqFlags, Token, _ListMIC}}) ->
@@ -170,7 +170,7 @@ init_sec_context(Context, spnego, {Service, Hostname}, _Data, {negTokenInit, {'N
 
 init_sec_context_spnego(Context, {Service, Hostname}, Token) ->
     ?DEBUG("negTokenInit~n", []),
-    case gssapi:init_sec_context(Context, Service, Hostname, Token) of
+    case egssapi:init_sec_context(Context, Service, Hostname, Token) of
 	{error, Reason} ->
 	    {error, Reason};
 	{Status, {Context2, Init}} ->
@@ -180,7 +180,7 @@ init_sec_context_spnego(Context, {Service, Hostname}, Token) ->
 
 
 delete_sec_context(Context) ->
-    gssapi:delete_sec_context(Context).
+    egssapi:delete_sec_context(Context).
 
 %%====================================================================
 %% Internal functions
@@ -277,7 +277,7 @@ test() ->
     Data = <<1,2,3,4>>,
     {?OID_KRB5, Data} = decode_gssapi(encode_gssapi(?OID_KRB5, Data)),
 
-    {ok, Server} = gssapi:start_link("http.keytab"),
+    {ok, Server} = egssapi:start_link("http.keytab"),
     {ok, {Context2, Token2}}=init_sec_context(Server, krb5, "HTTP", gethostname()),
 %%     io:format("krb5: ~p~n", [Token2]),
     {ok, done} = delete_sec_context(Context2),
@@ -293,7 +293,7 @@ test() ->
     {ok, {Context3, _User1, _Ccname1, _Resp1}}=accept_sec_context(Server, Token1),
     {ok, done} = delete_sec_context(Context3),
 
-    ok = gssapi:stop(Server),
+    ok = egssapi:stop(Server),
     ok.
 
 gethostname() ->
