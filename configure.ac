@@ -42,7 +42,7 @@ AC_SUBST(ERL_FLAGS)
 
 AC_CONFIG_FILES([
 		 Makefile
-		 egssapi
+		 egssapi/Makefile
 		 egssapi/c_src/Makefile
 		 egssapi/src/Makefile
 		])
