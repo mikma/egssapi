@@ -86,10 +86,10 @@
 
 %%--------------------------------------------------------------------
 %% Function: accept_sec_context(Server_ref|Context, Data)
-%%           Server_ref = pid() | atom(), pid or registered server name
-%%           Context = context record(), security context
-%%           Data = list() | binary(), SPNEGO data, base64 or binary
-%% Descrip.: Start gsasl port driver 
+%%           Server_ref = pid() | atom(), egssapi pid or registered server name
+%%           Context = context record(), egssapi security context
+%%           Data = binary(), SPNEGO data
+%% Descrip.: Accept security context
 %% Returns : {ok, {Context, User, Ccname, Resp}} |
 %%           {needsmore, {Context, Resp}} |
 %%           {error, Error}
@@ -98,8 +98,6 @@
 %%           Ccname = list(), credential cache env
 %%           Resp = binary(), SPNEGO response
 %%--------------------------------------------------------------------
-accept_sec_context(Context, Data) when is_list(Data) ->
-    accept_sec_context(Context, base64:decode(Data));
 accept_sec_context(Context, Data) ->
     {Mode, Token} = decode(Data),
     catch accept_sec_context(Context, Mode, Data, Token).
@@ -139,13 +137,13 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
 %%--------------------------------------------------------------------
 %% Function: init_sec_context(Server_ref|Context, Mech, Service, Hostname) |
 %%           init_sec_context(Server_ref|Context, Service, Hostname, Data)
-%%           Server_ref = pid() | atom(), pid or registered server name
-%%           Context = context record(), security context
+%%           Server_ref = pid() | atom(), egssapi pid or registered server name
+%%           Context = context record(), egssapi security context
 %%           Mech = atom(), SPNEGO mechanism (krb5 or spnego)
 %%           Service = list(), service name (ex. "HTTP")
 %%           Hostname = list(), hostname
-%%           Data = list() | binary(), SPNEGO data, base64 or binary
-%% Descrip.: 
+%%           Data = binary(), SPNEGO data
+%% Descrip.: Initialize security context
 %% Returns : {ok, {Context, Resp}} | {needsmore, {Context, Resp}} |
 %%           {error, Error}
 %%           Context = context record(), security context
@@ -155,8 +153,6 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
 init_sec_context(Context, Mech, Service, Hostname) when is_atom(Mech) ->
     init_sec_context(Context, Mech, {Service, Hostname}, <<>>, undefined);
 
-init_sec_context(Context, Service, Hostname, Data) when is_list(Data) ->
-    init_sec_context(Context, Service, Hostname, base64:decode(Data));
 init_sec_context(Context, Service, Hostname, Data) ->
     {Mode, Token} = decode(Data),
     init_sec_context(Context, Mode, {Service, Hostname}, Data, Token).
@@ -180,6 +176,13 @@ init_sec_context_spnego(Context, {Service, Hostname}, Token) ->
     end.
 
 
+%%--------------------------------------------------------------------
+%% Function: delete_sec_context(Context) 
+%%           Context = context record(), security context
+%% Descrip.: Delete security context
+%% Returns : {ok, done} | {error, Error}
+%%           Error = number(), GSSAPI error code
+%%--------------------------------------------------------------------
 delete_sec_context(Context) ->
     egssapi:delete_sec_context(Context).
 
