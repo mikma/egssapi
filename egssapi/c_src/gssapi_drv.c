@@ -529,7 +529,6 @@ static int delete_sec_context(char *buf, int index, ei_x_buff *presult)
       {delete_sec_context, Idx} -> {ok, }
     */
 
-    int arity;
     long idx;
     OM_uint32 maj_stat, min_stat;
 	
@@ -570,7 +569,6 @@ static int wrap(char *buf, int index, ei_x_buff *presult)
     int arity;
     gss_buffer_desc in;
     gss_buffer_desc out;
-    int res;
     long idx;
     char conf_str[MAXATOMLEN];
     int conf_req;
@@ -615,7 +613,7 @@ static int wrap(char *buf, int index, ei_x_buff *presult)
 	    );
 
     } else {
-	EI(ei_x_encode_atom(&result, "error") || ei_x_encode_long(&result, res));
+	EI(ei_x_encode_atom(&result, "error") || ei_x_encode_long(&result, maj_stat));
     }
 
 error:
@@ -640,7 +638,6 @@ static int unwrap(char *buf, int index, ei_x_buff *presult)
     int arity;
     gss_buffer_desc in;
     gss_buffer_desc out;
-    int res;
     long idx;
     int conf_state;
     OM_uint32 maj_stat, min_stat;
@@ -673,7 +670,7 @@ static int unwrap(char *buf, int index, ei_x_buff *presult)
 	    );
 
     } else {
-	EI(ei_x_encode_atom(&result, "error") || ei_x_encode_long(&result, res));
+	EI(ei_x_encode_atom(&result, "error") || ei_x_encode_long(&result, maj_stat));
     }
 
 error:
@@ -765,7 +762,7 @@ int main(int argc, char *argv[])
 	ei_x_free(&result);
     }
 
-error:
+/* error: */
     fprintf(stderr, "No more command, exiting\r\n");
 
     return 0;

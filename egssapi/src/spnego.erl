@@ -113,7 +113,8 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
     case lists:member(?OID_KRB5, Types) of
 	false ->
 	    Spnego1 = {negTokenResp, {'NegTokenResp', reject, ?OID_KRB5, [], asn1_NOVALUE}},
-	    Resp1 = encode_spnego(Spnego1),
+	    %% TODO use Resp1
+	    _Resp1 = encode_spnego(Spnego1),
 %% 	    {Status, {User, Ccname, Resp1}},
 	    throw({error, unsupported_mech});
 	true ->
