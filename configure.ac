@@ -3,11 +3,8 @@
 
 AC_PREREQ(2.59)
 AC_INIT(egssapi, 0.1, [Mikael Magnusson <mikma@users.sourceforge.net>])
+AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([configure.ac])
-
-dnl AC_CANONICAL_HOST
-dnl AC_CANONICAL_TARGET
-
 AM_INIT_AUTOMAKE
 
 dnl AM_CONFIG_HEADER([config.h])
@@ -41,18 +38,13 @@ AC_ERLANG_LIB_VER(stdlib)
 AC_ERLANG_LIB_VER(sasl)
 AC_ERLANG_LIB_VER(crypto)
 
-dnl AC_PATH_PROGS([ERLC],[erlc],,[$path])
-dnl AC_PATH_PROGS([ERL],[erl],,[$path])
-dnl AC_LANG_PUSH(C++)
-
 AC_SUBST(ERL_FLAGS)
 
 AC_CONFIG_FILES([
 		 Makefile
-		 ebin/Makefile
-		 priv/Makefile
-		 c_src/Makefile
-		 src/Makefile
+		 egssapi
+		 egssapi/c_src/Makefile
+		 egssapi/src/Makefile
 		])
 
 AC_OUTPUT

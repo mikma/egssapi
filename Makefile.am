@@ -1,4 +1,4 @@
-SUBDIRS = ebin priv
+SUBDIRS = 
 
 AM_ERL_FLAGS = -pa `pwd`/../egssapi/ebin -pa ~/tmp/cvs/jungerl/lib/eldap/ebin
 
