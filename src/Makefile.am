@@ -1,13 +1,24 @@
-# Empty
-VPATH = ../c_src
+include $(top_srcdir)/app.mk
 
-AM_CFLAGS = -Wall -g -DHAVE_KRB5
-AM_CPPFLAGS = -I/usr/include/gssapi
+VPATH = ../src
 
-privdir = $(ERLANG_INSTALL_LIB_DIR)/gssapi-0.0/priv
-priv_PROGRAMS = gssapi_drv
+OPT_APP = gssapi
 
-gssapi_drv_LDFLAGS = `krb5-config --libs krb5 gssapi`
-gssapi_drv_LDADD = -lei
-gssapi_drv_SOURCES = gssapi_drv.c krb5_deleg.c krb5_deleg.h	\
-port_util.c port_util.h
+gssapi_VSN = 0.1
+
+gssapi_SRCS = \
+	../src/spnego.erl \
+	SPNEGOASNOneSpec.erl \
+	../src/gssapi.erl
+
+# gssapi_HDRS =
+
+AM_ERLCFLAGS = -I$(top_builddir)/include -I$(srcdir)    \
+-I$(ERLANG_LIB_DIR_xmerl)/include
+AM_ERL_FLAGS =
+
+CLEANFILES += SPNEGOASNOneSpec.asn1db SPNEGOASNOneSpec.erl	\
+SPNEGOASNOneSpec.hrl
+
+SPNEGOASNOneSpec.erl: SPNEGOASNOneSpec.asn1
+	$(ERLC) +der $?
