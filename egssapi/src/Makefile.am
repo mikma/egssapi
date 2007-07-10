@@ -1,15 +1,13 @@
 include $(top_srcdir)/app.mk
 
-VPATH = ../src
-
 OPT_APP = gssapi
 
 gssapi_VSN = 0.1
 
 gssapi_SRCS = \
-	../src/spnego.erl \
+	spnego.erl \
 	SPNEGOASNOneSpec.erl \
-	../src/gssapi.erl
+	gssapi.erl
 
 # gssapi_HDRS =
 

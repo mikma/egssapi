@@ -1,6 +1,3 @@
-# Empty
-VPATH = ../c_src
-
 AM_CFLAGS = -Wall -g -DHAVE_KRB5
 AM_CPPFLAGS = -I/usr/include/gssapi
 
