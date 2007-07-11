@@ -7,7 +7,7 @@ inc_HEADERS = $($(OPT_APP)_HDRS)
 beam_FILES = $($(OPT_APP)_SRCS:.erl=.beam)
 
 ebin_DATA = $(beam_FILES) $(OPT_APP:=.app)
-EXTRA_DIST = $($(OPT_APP)_SRCS) ../src/$(OPT_APP:=.app-in)
+EXTRA_DIST = $($(OPT_APP)_SRCS) $(OPT_APP:=.app-in)
 CLEANFILES = $(beam_FILES) $(OPT_APP:=.app)
 
 include $(top_srcdir)/rules.mk
