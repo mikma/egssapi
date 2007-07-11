@@ -2,7 +2,7 @@ include $(top_srcdir)/app.mk
 
 OTP_APP = egssapi
 
-egssapi_VSN = 0.1
+egssapi_VSN = $(VERSION)
 
 egssapi_SRCS = \
 	spnego.erl \
