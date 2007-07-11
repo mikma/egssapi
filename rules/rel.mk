@@ -9,4 +9,4 @@ EXTRA_DIST = $(OTP_RELEASES:=.rel.in)
 CLEANFILES = $(OTP_RELEASES:=.boot) $(OTP_RELEASES:=.rel)	\
 $(OTP_RELEASES:=.script)
 
-include $(top_srcdir)/rules.mk
+include $(top_srcdir)/rules/rules.mk

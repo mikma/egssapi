@@ -10,4 +10,4 @@ ebin_DATA = $(beam_FILES) $(OTP_APP:=.app)
 EXTRA_DIST = $($(OTP_APP)_SRCS) $(OTP_APP:=.app-in)
 CLEANFILES = $(beam_FILES) $(OTP_APP:=.app)
 
-include $(top_srcdir)/rules.mk
+include $(top_srcdir)/rules/rules.mk
