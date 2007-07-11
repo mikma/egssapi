@@ -79,7 +79,7 @@
 
 
 #ifdef HAVE_KRB5
-#include <gssapi_krb5.h>
+#include <gssapi/gssapi_krb5.h>
 #include <krb5.h>
 #endif
 
