@@ -5,6 +5,7 @@ AC_PREREQ(2.59)
 AC_INIT(egssapi, 0.1, [Mikael Magnusson <mikma@users.sourceforge.net>])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([configure.ac])
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE
 
 dnl AM_CONFIG_HEADER([config.h])
@@ -21,18 +22,6 @@ AC_ERLANG_PATH_ERL
 AC_ERLANG_SUBST_INSTALL_LIB_DIR
 AC_ERLANG_CHECK_LIB(kernel)
 AC_ERLANG_CHECK_LIB(stdlib)
-
-ERLANG_LIB_VER_SUBST=""
-AC_SUBST([ERLANG_LIB_VER_SUBST])
-AC_DEFUN([AC_ERLANG_LIB_VER],
-[AC_CACHE_CHECK([Erlang/OTP '$1' library version], [erlang_cv_lib_ver_$1],
-   [if test "$ERLANG_LIB_VER_$1" = ""; then
-       erlang_cv_lib_ver_$1=`echo "$ERLANG_LIB_DIR_$1"|sed -e "s/.*-\(.*\)/\1/"`
-    fi])
-AC_SUBST([ERLANG_LIB_VER_$1], [$erlang_cv_lib_ver_$1])
-ERLANG_LIB_VER_SUBST="$ERLANG_LIB_VER_SUBST -e 's,[@]ERLANG_LIB_VER_$1[@],\$(ERLANG_LIB_VER_$1),g'"
-]) # AC_ERLANG_LIB_VER
-
 AC_ERLANG_LIB_VER(kernel)
 AC_ERLANG_LIB_VER(stdlib)
 
