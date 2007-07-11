@@ -1,6 +1,6 @@
 include $(top_srcdir)/app.mk
 
-OPT_APP = egssapi
+OTP_APP = egssapi
 
 egssapi_VSN = 0.1
 

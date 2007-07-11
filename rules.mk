@@ -1,5 +1,5 @@
 SUBST = sed $(ERLANG_LIB_VER_SUBST) \
-	-e 's/[@]$(OPT_APP)_VSN[@]/$($(OPT_APP)_VSN)/'
+	-e 's/[@]$(OTP_APP)_VSN[@]/$($(OPT_APP)_VSN)/'
 
 %.rel: %.rel.in
 	$(SUBST) $< > $@
