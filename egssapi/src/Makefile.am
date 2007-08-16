@@ -16,6 +16,7 @@ AM_ERL_FLAGS =
 
 CLEANFILES += SPNEGOASNOneSpec.asn1db SPNEGOASNOneSpec.erl	\
 SPNEGOASNOneSpec.hrl
+EXTRA_DIST += SPNEGOASNOneSpec.asn1 SPNEGOASNOneSpec.hrl
 
 SPNEGOASNOneSpec.erl: SPNEGOASNOneSpec.asn1
 	$(ERLC) +der $?

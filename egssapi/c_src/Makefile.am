@@ -7,4 +7,4 @@ priv_PROGRAMS = gssapi_drv
 gssapi_drv_LDFLAGS = $(K5LIBS)
 gssapi_drv_LDADD = $(EI_LIBS)
 gssapi_drv_SOURCES = gssapi_drv.c krb5_deleg.c krb5_deleg.h	\
-port_util.c port_util.h
+port_util.c port_util.h config.h
