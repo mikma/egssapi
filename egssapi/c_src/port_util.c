@@ -13,9 +13,10 @@ int decode_string(char *buf, int *index, char **str)
 
     if (ei_get_type(buf, index, &type, &len)) return 5;
 
-    *str = malloc(len);
+    *str = malloc(len + 1);
 
     if (ei_decode_string(buf, index, *str)) return 8;
+    (*str)[len] = '\0';
 
     return 0;
 }
