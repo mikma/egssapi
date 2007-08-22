@@ -1,5 +1,7 @@
 SUBDIRS = egssapi
 
+EXTRA_DIST = bootstrap
+
 AM_ERL_FLAGS = -pa egssapi/ebin
 
 run-yaws:

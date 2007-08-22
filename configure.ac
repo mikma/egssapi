@@ -18,7 +18,8 @@
 #
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.59)
+# Needs autoconf 2.59c for erlang support
+AC_PREREQ(2.59c)
 AC_INIT(egssapi, 0.1~pre2, [Mikael Magnusson <mikma@users.sourceforge.net>])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([configure.ac])
