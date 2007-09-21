@@ -119,7 +119,7 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
 	    ok
     end,
 
-    {Status, {Context2,User,Ccname,Resp}} = egssapi:accept_sec_context(Context, list_to_binary(Token)),
+    {Status, Value} = egssapi:accept_sec_context(Context, list_to_binary(Token)),
     
     Neg_state =
 	case Status of
@@ -129,6 +129,14 @@ accept_sec_context(Context, spnego, _Data, {negTokenInit, {'NegTokenInit', Types
 		'accept-incomplete';
 	    error ->
 		'reject'
+	end,
+
+    {Context2, User, Ccname, Resp} =
+	case Status of
+	    error ->
+		{undefined, undefined, undefined, asn1_NOVALUE};
+	    _ ->
+		Value
 	end,
 
     Spnego = {negTokenResp, {'NegTokenResp', Neg_state, ?OID_KRB5, Resp, asn1_NOVALUE}},
