@@ -1,10 +1,9 @@
-{application, gssapi,
+{application, egssapi,
  [{description, "GSSAPI"},
   {vsn,"@egssapi_VSN@"},
   {modules, [
 	     'SPNEGOASNOneSpec',
-	     gsasl,
-	     gssapi,
+	     egssapi,
 	     spnego
 	    ]},
   {registered, []},
