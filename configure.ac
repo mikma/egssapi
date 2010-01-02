@@ -24,7 +24,7 @@ AC_INIT(egssapi, 0.1, [Mikael Magnusson <mikma@users.sourceforge.net>])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([foreign])
 
 dnl AM_CONFIG_HEADER([config.h])
 
