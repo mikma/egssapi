@@ -1,0 +1,15 @@
+.deps
+aclocal.m4
+autom4te.cache
+config
+configure
+config.log
+config.status
+Makefile.in
+Makefile
+SPNEGOASNOneSpec.asn1db
+SPNEGOASNOneSpec.erl
+SPNEGOASNOneSpec.hrl
+*.app
+*.beam
+*.o
