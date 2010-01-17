@@ -5,6 +5,7 @@ config
 configure
 config.log
 config.status
+gssapi_drv
 Makefile.in
 Makefile
 SPNEGOASNOneSpec.asn1db
