@@ -32,8 +32,8 @@ AC_ARG_VAR([ERL_FLAGS], [Erlang/OTP emulator flags [none]])dnl
 
 dnl Checks for libraries.
 AC_ARG_WITH([kerberos5],
-    [AS_HELP_STRING([--with-kerberos5=PATH], [Use MIT kerberos5 library [default=yes]])],
-    [], [with_kerberos5="yes"])
+    [AS_HELP_STRING([--with-kerberos5=PATH], [Use MIT kerberos5 library [default=/usr]])],
+    [], [with_kerberos5="/usr"])
 
 # Checks for programs.
 AC_PROG_CC
@@ -59,6 +59,10 @@ save_LDFLAGS=$LDFLAGS
 AC_CHECK_KRB5
 CPPFLAGS=$save_CPPFLAGS
 LDFLAGS=$save_LDFLAGS
+
+if test "$KRB5CONF" == ""; then
+   AC_MSG_ERROR([--with-kerberos5=${KRB5ROOT} used but ${KRB5ROOT}/bin/krb5-config not found])
+fi
 
 AC_SUBST(K5CFLAGS)
 AC_SUBST(K5LIBS)
