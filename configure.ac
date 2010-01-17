@@ -48,11 +48,7 @@ AC_ERLANG_CHECK_LIB(stdlib)
 AC_ERLANG_LIB_VER(kernel)
 AC_ERLANG_LIB_VER(stdlib)
 
-AC_CHECK_HEADER([ei.h],,[dnl
-    AC_MSG_ERROR([You need the ei.h header])])
-
-AC_CHECK_LIB([ei], [ei_decode_version], EI_LIBS="-lei", [dnl
-    AC_MSG_ERROR([You need the ei library])])
+ERLANG_CHECK_EI
 
 save_CPPFLAGS=$CPPFLAGS
 save_LDFLAGS=$LDFLAGS
