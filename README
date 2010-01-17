@@ -1,2 +1,24 @@
+Erlang GSSAPI and SPNEGO API.
+
 Generic Security Services Application Program Interface (GSSAPI) and
 Simple and Protected GSSAPI Negotiation Mechanism (SPNEGO) support.
+
+check
+=====
+
+Before running "make check" you need to do the following:
+
+* Add a HTTP service principal for the machine you will run "make check" on.
+  For example using:
+   $ kadmin.local: addprinc -randkey HTTP/<fqdn>
+
+* Store the key in "http.keytab" in the top build directory.
+  For example using:
+   $ kadmin.local: ktadd -k http.keytab HTTP/<fqdn>
+
+* Obtain and cache a Kerberos ticket-granting ticket with kinit.
+
+* Run "make check"
+
+* The outcome is indicated by make which outputs "*** [check] Error" if an
+  error occurred.
